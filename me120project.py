@@ -1,25 +1,12 @@
 """
 ME120 — Tumor Growth PINN
-=========================
-Self-contained local script. Run with:
-
-    python me120project.py
-
-Sections (run in order, all in one process):
-  1. Config & Parameters
-  2. PDE Solver & Dataset Generation
-  3. PDE Validation (no neural network needed)
-  4. PINN Training & Evaluation
-
-Outputs written to:  ./tumor_project_data/   and   ./pinn_output/
+Run: python me120project.py
+Outputs: ./tumor_project_data/  ./pinn_output/
 """
-# ─────────────────────────────────────────────────────────────────────────────
-# IMPORTS
-# ─────────────────────────────────────────────────────────────────────────────
 
 import numpy as np
 import matplotlib
-matplotlib.use("Agg")          # non-interactive backend — saves files, no GUI popup
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.colors import LinearSegmentedColormap
@@ -30,9 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 1 — CONFIG & PARAMETERS
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Config ────────────────────────────────────────────────────────────────────
 
 DATA_DIR = "./tumor_project_data/"
 OUT_DIR  = "./pinn_output/"
@@ -42,7 +27,7 @@ os.makedirs(OUT_DIR,  exist_ok=True)
 FIXED_PARAMS = {
     "K":      1.0,
     "D_n":    0.01,
-    "alpha":  0.02,      # was 0.10 — reduced to prevent nutrient starvation
+    "alpha":  0.02,
     "N":      64,
     "dx":     1.0 / 64,
     "dt":     0.001,
@@ -72,7 +57,6 @@ VALIDATION_PARAMS = [
     {"D_c": 1.2e-2, "rho": 0.050, "alpha": 0.015, "label": "Val-3 Mid (near boundary)"},
 ]
 
-# PINN config — mirrors FIXED_PARAMS where applicable
 CFG = {
     "train_path": os.path.join(DATA_DIR, "dataset.npz"),
     "val_path":   os.path.join(DATA_DIR, "val_dataset.npz"),
@@ -82,9 +66,9 @@ CFG = {
     "T":          float(FIXED_PARAMS["T"]),
     "K":          FIXED_PARAMS["K"],
     "D_n":        FIXED_PARAMS["D_n"],
-    "D_c_min":    1e-3,  "D_c_max":  3.4e-2,
-    "rho_min": 0.015,  "rho_max": 0.150, 
-    "alpha_min": 0.01,  "alpha_max": 0.02,
+    "D_c_min":    1e-3,   "D_c_max":   3.4e-2,
+    "rho_min":    0.015,  "rho_max":   0.150,
+    "alpha_min":  0.01,   "alpha_max": 0.02,
     "enc_channels":      [1, 32, 64, 64, 128],
     "dec_channels":      [128, 64, 32, 16, 1],
     "film_hidden":       64,
@@ -102,16 +86,14 @@ CFG = {
     "seed":              42,
 }
 
-# Save config for reference
-config = {"DATA_DIR": DATA_DIR, "FIXED_PARAMS": FIXED_PARAMS,
-          "PARAM_SWEEP": PARAM_SWEEP, "VALIDATION_PARAMS": VALIDATION_PARAMS}
 with open(os.path.join(DATA_DIR, "config.json"), "w") as f:
-    json.dump(config, f, indent=2)
+    json.dump({"DATA_DIR": DATA_DIR, "FIXED_PARAMS": FIXED_PARAMS,
+               "PARAM_SWEEP": PARAM_SWEEP, "VALIDATION_PARAMS": VALIDATION_PARAMS},
+              f, indent=2)
 
 torch.manual_seed(CFG["seed"])
 np.random.seed(CFG["seed"])
 
-# Unpack FIXED_PARAMS into local variables for convenience
 FP     = FIXED_PARAMS
 N      = FP["N"]
 dx     = FP["dx"]
@@ -129,7 +111,6 @@ print(f"  Grid: {N}×{N}  |  dx={dx:.4f}  |  dt={dt}  |  T={T} days")
 print(f"  Training sims: {len(PARAM_SWEEP)}  |  Val sims: {len(VALIDATION_PARAMS)}")
 print(f"  Device: {CFG['device']}")
 
-# CFL stability check
 print("\n── CFL Stability Check ──────────────────────────────────────────")
 for p in PARAM_SWEEP:
     cfl_c = p["D_c"] * dt / dx**2
@@ -138,9 +119,7 @@ for p in PARAM_SWEEP:
     print(f"  {p['label']:30s}  CFL_c={cfl_c:.5f}  CFL_n={cfl_n:.5f}  {status}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 2 — PDE SOLVER & DATASET GENERATION
-# ─────────────────────────────────────────────────────────────────────────────
+# ── PDE Solver ────────────────────────────────────────────────────────────────
 
 def make_initial_conditions(N, sigma, c0_max, nutrient_val=1.0):
     """Gaussian tumor seed centered in domain; uniform nutrient field."""
@@ -171,7 +150,7 @@ def run_pde(D_c, rho, alpha=None, K=None, D_n=None,
       ∂c/∂t = D_c · ∇²c  +  ρ · c · n · (1 − c/K)
       ∂n/∂t = D_n · ∇²n  −  α · c · n
 
-    All None arguments fall back to FIXED_PARAMS.
+    Returns snapshots dict, times array, tumor area array.
     """
     alpha  = alpha  if alpha  is not None else FP["alpha"]
     K      = K      if K      is not None else FP["K"]
@@ -208,6 +187,8 @@ def run_pde(D_c, rho, alpha=None, K=None, D_n=None,
     return snapshots, np.array(times), np.array(tumor_area)
 
 
+# ── Dataset Generation ────────────────────────────────────────────────────────
+
 print("\n── Running PDE Simulations ─────────────────────────────────────────")
 train_c_initial, train_c_final, train_n_final = [], [], []
 train_params, train_areas, train_labels = [], [], []
@@ -221,10 +202,9 @@ for i, p in enumerate(PARAM_SWEEP):
     sk = sorted(snaps.keys())
     SNAPSHOT_TIMES = [5, 10, 20, 30]
     for t_target in SNAPSHOT_TIMES:
-        # Find the closest saved snapshot to the target time
         closest_key = min(snaps.keys(), key=lambda t: abs(t - t_target))
-        train_c_initial.append(snaps[sk[0]][0])          # always t=0 as input
-        train_c_final.append(snaps[closest_key][0])      # target at this timestep
+        train_c_initial.append(snaps[sk[0]][0])
+        train_c_final.append(snaps[closest_key][0])
         train_n_final.append(snaps[closest_key][1])
         train_params.append([p["D_c"], p["rho"], p["alpha"]])
         train_areas.append(np.sum(snaps[closest_key][0] > 0.01) * dx**2)
@@ -271,9 +251,7 @@ np.savez_compressed(os.path.join(DATA_DIR, "val_dataset.npz"),
 print(f"\n[✓] Datasets saved to {DATA_DIR}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 3 — PDE VALIDATION (no neural network)
-# ─────────────────────────────────────────────────────────────────────────────
+# ── PDE Validation ────────────────────────────────────────────────────────────
 
 print("\n" + "=" * 62)
 print("  PDE SOLVER VALIDATION")
@@ -286,7 +264,6 @@ c_final    = train_data["c_final"]
 areas      = train_data["areas"]
 vc_final   = val_data["c_final"]
 
-# Test 1: Field bounds
 print("\n── TEST 1: Field Bounds ─────────────────────────────────────")
 all_pass = True
 for i in range(len(PARAM_SWEEP)):
@@ -300,54 +277,38 @@ for i in range(len(PARAM_SWEEP)):
           f"n∈[{n_all.min():.4f},{n_all.max():.4f}]  [{status}]")
 print(f"\n  Result: {'ALL PASS ✓' if all_pass else 'FAILURES DETECTED ✗'}")
 
-# TEST 2: Total mass should be monotonically non-decreasing
-# Mass = sum of all cell densities × dx² (no threshold)
 print("\n── TEST 2: Total Tumor Mass (non-decreasing) ────────────────")
 all_pass = True
 for i in range(len(PARAM_SWEEP)):
     snap      = np.load(os.path.join(DATA_DIR, f"snapshots_sim{i:02d}.npz"))
     c_snaps   = snap["c"]
     times     = snap["times"]
-
-    # Total mass at each timestep — no threshold
     mass_seq  = [c_snaps[j].sum() * dx**2 for j in range(len(times))]
     diffs     = np.diff(mass_seq)
     max_drop  = min(diffs) if len(diffs) > 0 else 0
-
-    # Mass should never decrease by more than 0.1% (numerical noise tolerance)
-    ok        = max_drop >= -1e-4
+    ok        = max_drop >= -1e-4  # tolerance for numerical noise
     if not ok: all_pass = False
     print(f"  Sim {i+1:2d}  mass: {mass_seq[0]:.4f} → {mass_seq[-1]:.4f}"
           f"  max_drop={max_drop:+.6f}  [{'PASS' if ok else 'FAIL'}]")
-
 print(f"\n  Result: {'ALL PASS ✓' if all_pass else 'FAILURES DETECTED ✗'}")
 
-# Test 3: Zero-flux BCs
-# Test 3: Boundary conditions
 print("\n── TEST 3: Zero-Flux Boundary Conditions ────────────────────")
 all_pass = True
 for i in range(len(PARAM_SWEEP)):
     snap    = np.load(os.path.join(DATA_DIR, f"snapshots_sim{i:02d}.npz"))
     c_snaps = snap["c"]
-
     c_t0 = c_snaps[0]
     c_tT = c_snaps[-1]
-
     edge_t0 = max(c_t0[0,  :].max(), c_t0[-1, :].max(),
                   c_t0[:,  0].max(), c_t0[:, -1].max())
     edge_tT = max(c_tT[0,  :].max(), c_tT[-1, :].max(),
                   c_tT[:,  0].max(), c_tT[:, -1].max())
-
-    # Boundary density should not grow significantly over time
     ok = edge_tT <= edge_t0 + 0.01
     if not ok: all_pass = False
-
     print(f"  Sim {i+1:2d}  edge t=0: {edge_t0:.4f}  edge t=T: {edge_tT:.4f}"
           f"  delta={edge_tT - edge_t0:+.4f}  [{'PASS' if ok else 'FAIL'}]")
-
 print(f"\n  Result: {'ALL PASS ✓' if all_pass else 'FAILURES DETECTED ✗'}")
 
-# Test 4: Nutrient anti-correlation
 print("\n── TEST 4: Nutrient–Tumor Anti-Correlation ──────────────────")
 all_pass = True
 n_final_arr = train_data["n_final"]
@@ -358,7 +319,6 @@ for i in range(len(PARAM_SWEEP)):
     print(f"  Sim {i+1:2d}  Pearson r = {corr:+.4f}  [{'PASS' if ok else 'FAIL'}]")
 print(f"\n  Result: {'ALL PASS ✓' if all_pass else 'SOME WEAK CORRELATIONS ✗'}")
 
-# Validation figures
 tumor_cmap = LinearSegmentedColormap.from_list(
     "tumor", ["#0d0d1a","#1a1a4e","#3d1c8e","#8b2fc9","#e0529c","#ffa07a","#fff5e6"])
 nutr_cmap  = LinearSegmentedColormap.from_list(
@@ -368,7 +328,6 @@ colors_p   = ["#e0529c","#4fc3f7","#81c784","#ffb74d","#ce93d8",
 
 val_areas = [np.sum(vc_final[i] > 0.005) * dx**2 for i in range(len(VALIDATION_PARAMS))]
 
-# Figure A: growth curves
 fig, axes = plt.subplots(1, 2, figsize=(14, 5), facecolor="#0d1117")
 fig.suptitle("PDE Validation — Growth Curves & Final Areas",
              color="white", fontsize=14, fontweight="bold")
@@ -413,7 +372,6 @@ plt.savefig(os.path.join(OUT_DIR, "val_figA_growth.png"),
 plt.close()
 print("\n[✓] Saved val_figA_growth.png")
 
-# Figure B: initial vs final fields
 fig = plt.figure(figsize=(20, 8), facecolor="#0d1117")
 fig.suptitle("PDE Fields — Initial → Final  (all training simulations)",
              color="white", fontsize=13, fontweight="bold")
@@ -434,7 +392,6 @@ plt.savefig(os.path.join(OUT_DIR, "val_figB_fields.png"),
 plt.close()
 print("[✓] Saved val_figB_fields.png")
 
-# Figure C: validation hold-outs
 fig, axes = plt.subplots(2, 3, figsize=(12, 7), facecolor="#0d1117")
 fig.suptitle("Validation Hold-Out Simulations",
              color="white", fontsize=13, fontweight="bold")
@@ -461,9 +418,7 @@ plt.close()
 print("[✓] Saved val_figC_holdout.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 4 — PINN ARCHITECTURE
-# ─────────────────────────────────────────────────────────────────────────────
+# ── PINN Architecture ─────────────────────────────────────────────────────────
 
 class TumorDataset(Dataset):
     def __init__(self, npz_path, cfg, augment=False):
@@ -477,6 +432,7 @@ class TumorDataset(Dataset):
         D   = raw_params[:, 0]
         rho = raw_params[:, 1]
         alp = raw_params[:, 2]
+        # Log-scale normalization for D_c; linear for rho and alpha
         D_norm   = (torch.log10(D)   - np.log10(cfg["D_c_min"])) / \
                    (np.log10(cfg["D_c_max"]) - np.log10(cfg["D_c_min"]))
         rho_norm = (rho - cfg["rho_min"])   / (cfg["rho_max"]   - cfg["rho_min"])
@@ -551,30 +507,25 @@ class TumorPINN(nn.Module):
     """
     def __init__(self, cfg):
         super().__init__()
-        enc = cfg["enc_channels"]   # [1, 32, 64, 64, 128]
-        dec = cfg["dec_channels"]   # [128, 64, 32, 16, 1]
+        enc = cfg["enc_channels"]
+        dec = cfg["dec_channels"]
         n_p = cfg["n_params"]
         fh  = cfg["film_hidden"]
 
-        # Encoder
         self.enc0 = ConvBlock(enc[0], enc[1])
         self.enc1 = ConvBlock(enc[1], enc[2], residual=True)
         self.enc2 = ConvBlock(enc[2], enc[3], residual=True)
         self.enc3 = ConvBlock(enc[3], enc[4], residual=True)
         self.pool = nn.MaxPool2d(2)
 
-        # FiLM at each encoder scale
         self.film0 = FiLM(n_p, enc[1], fh)
         self.film1 = FiLM(n_p, enc[2], fh)
         self.film2 = FiLM(n_p, enc[3], fh)
         self.film3 = FiLM(n_p, enc[4], fh)
 
-        # Bottleneck
         self.bottleneck = ConvBlock(enc[4], enc[4], residual=True)
         self.film_bn    = FiLM(n_p, enc[4], fh)
 
-        # Decoder — each dec block receives upsample_out + skip
-        # Channels: up3_out=dec[1], skip_e3=enc[3]  → dec[1]+enc[3]
         self.up3  = nn.ConvTranspose2d(enc[4],  dec[1], 2, stride=2)
         self.dec3 = ConvBlock(dec[1] + enc[4],  dec[1], residual=True)
 
@@ -604,9 +555,7 @@ class TumorPINN(nn.Module):
         return self.head(d0)                                   # (B,  1, 64, 64)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 5 — PHYSICS LOSSES
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Physics Losses ────────────────────────────────────────────────────────────
 
 def laplacian_2d_torch(u, dx):
     """5-point FD Laplacian with reflect padding (zero-flux BC). u: (B,1,H,W)"""
@@ -640,9 +589,7 @@ def boundary_loss(c_pred):
             ((c_pred[:, :, :, -1] - c_pred[:, :, :, -2]) ** 2).mean())
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 6 — TRAINING
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Training ──────────────────────────────────────────────────────────────────
 
 def train(cfg):
     device = torch.device(cfg["device"])
@@ -654,7 +601,7 @@ def train(cfg):
     val_loader   = DataLoader(val_ds,   batch_size=len(val_ds),
                               shuffle=False, drop_last=False)
 
-    model     = TumorPINN(cfg).to(device)
+    model = TumorPINN(cfg).to(device)
 
     checkpoint_path = os.path.join(cfg["out_dir"], "best_model.pt")
     if os.path.exists(checkpoint_path):
@@ -740,9 +687,7 @@ def train(cfg):
     return model, history, val_ds
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 7 — EVALUATION & PLOTS
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Evaluation & Plots ────────────────────────────────────────────────────────
 
 def evaluate_and_plot(model, val_ds, history, cfg):
     device = torch.device(cfg["device"])
@@ -761,7 +706,6 @@ def evaluate_and_plot(model, val_ds, history, cfg):
         "font.family": "monospace",
     })
 
-    # Training curves
     fig, axes = plt.subplots(1, 3, figsize=(16, 4), facecolor=BG)
     fig.suptitle("PINN Training History", color=TC, fontsize=13, fontweight="bold")
     ep_range = range(1, len(history["train_total"]) + 1)
@@ -783,7 +727,6 @@ def evaluate_and_plot(model, val_ds, history, cfg):
     plt.close()
     print("[✓] Saved training_curves.png")
 
-    # Predictions vs ground truth
     domain     = cfg["N"] * cfg["dx"]
     VAL_LABELS = ["Val-1 LGG", "Val-2 GBM", "Val-3 Mid"]
     all_pred, all_true = [], []
@@ -829,7 +772,6 @@ def evaluate_and_plot(model, val_ds, history, cfg):
     plt.close()
     print("[✓] Saved predictions.png")
 
-    # Pixel scatter
     fig, ax = plt.subplots(figsize=(7, 6), facecolor=BG)
     for i, (p_arr, t_arr) in enumerate(zip(all_pred, all_true)):
         ax.scatter(t_arr.flatten()[::4], p_arr.flatten()[::4],
@@ -849,16 +791,13 @@ def evaluate_and_plot(model, val_ds, history, cfg):
     print(f"\n[✓] All outputs in {cfg['out_dir']}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ENTRY POINT
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Entry Point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("\n── Training PINN ────────────────────────────────────────────────")
 
-    # Warm-start from existing checkpoint if available
     CFG["epochs"] = 400
-    CFG["lr"]     = 3e-4   # lower than before — fine-tuning on clean data
+    CFG["lr"]     = 3e-4
 
     model, history, val_ds = train(CFG)
 
@@ -866,11 +805,10 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(
         os.path.join(CFG["out_dir"], "best_model.pt"),
         map_location=CFG["device"],
-        weights_only=True))   # suppresses the FutureWarning in newer torch
+        weights_only=True))
 
     evaluate_and_plot(model, val_ds, history, CFG)
 
-    # ── Final metrics summary ─────────────────────────────────────
     print("\n── Final Validation Metrics ─────────────────────────────────────")
     device = torch.device(CFG["device"])
     model.eval()
