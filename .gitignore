@@ -6,3 +6,5 @@ __pycache__/
 *.pt
 *.npz
 *.pyc.DS_Store
+venv/
+venv/
