@@ -1,0 +1,8 @@
+tumor_project_data/
+pinn_output/
+venv/
+tumor-venv/
+__pycache__/
+*.pt
+*.npz
+*.pyc
