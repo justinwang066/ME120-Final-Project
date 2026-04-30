@@ -5,4 +5,4 @@ tumor-venv/
 __pycache__/
 *.pt
 *.npz
-*.pyc
+*.pyc.DS_Store
