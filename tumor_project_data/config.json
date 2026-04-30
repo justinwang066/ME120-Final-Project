@@ -1,0 +1,108 @@
+{
+  "DATA_DIR": "./tumor_project_data/",
+  "FIXED_PARAMS": {
+    "K": 1.0,
+    "D_n": 0.01,
+    "alpha": 0.02,
+    "N": 64,
+    "dx": 0.015625,
+    "dt": 0.001,
+    "T": 10,
+    "sigma": 6.0,
+    "c0_max": 0.8
+  },
+  "PARAM_SWEEP": [
+    {
+      "D_c": 0.001,
+      "rho": 0.015,
+      "alpha": 0.01,
+      "label": "LGG Low-D / Low-rho"
+    },
+    {
+      "D_c": 0.005,
+      "rho": 0.03,
+      "alpha": 0.02,
+      "label": "LGG Med-D / Low-rho"
+    },
+    {
+      "D_c": 0.01,
+      "rho": 0.036,
+      "alpha": 0.01,
+      "label": "LGG High-D / Low-rho"
+    },
+    {
+      "D_c": 0.01,
+      "rho": 0.09,
+      "alpha": 0.02,
+      "label": "GBM Low-D / Med-rho"
+    },
+    {
+      "D_c": 0.02,
+      "rho": 0.12,
+      "alpha": 0.02,
+      "label": "GBM Med-D / High-rho"
+    },
+    {
+      "D_c": 0.034,
+      "rho": 0.15,
+      "alpha": 0.02,
+      "label": "GBM High-D / High-rho"
+    },
+    {
+      "D_c": 0.003,
+      "rho": 0.045,
+      "alpha": 0.01,
+      "label": "Mid Low-D / Low-rho"
+    },
+    {
+      "D_c": 0.008,
+      "rho": 0.06,
+      "alpha": 0.02,
+      "label": "Mid Med-D / Med-rho"
+    },
+    {
+      "D_c": 0.015,
+      "rho": 0.075,
+      "alpha": 0.01,
+      "label": "Mid High-D / Med-rho"
+    },
+    {
+      "D_c": 0.025,
+      "rho": 0.105,
+      "alpha": 0.02,
+      "label": "Mid High-D / High-rho"
+    },
+    {
+      "D_c": 0.001,
+      "rho": 0.15,
+      "alpha": 0.02,
+      "label": "Low-D / High-rho"
+    },
+    {
+      "D_c": 0.034,
+      "rho": 0.015,
+      "alpha": 0.01,
+      "label": "High-D / Low-rho"
+    }
+  ],
+  "VALIDATION_PARAMS": [
+    {
+      "D_c": 0.004,
+      "rho": 0.025,
+      "alpha": 0.01,
+      "label": "Val-1 LGG (interpolated)"
+    },
+    {
+      "D_c": 0.018,
+      "rho": 0.045,
+      "alpha": 0.02,
+      "label": "Val-2 GBM (interpolated)"
+    },
+    {
+      "D_c": 0.012,
+      "rho": 0.05,
+      "alpha": 0.015,
+      "label": "Val-3 Mid (near boundary)"
+    }
+  ]
+}
