@@ -2,107 +2,108 @@
   "DATA_DIR": "./tumor_project_data/",
   "FIXED_PARAMS": {
     "K": 1.0,
-    "D_n": 0.01,
-    "alpha": 0.02,
+    "D_n": 0.1,
+    "alpha": 0.05,
     "N": 64,
-    "dx": 0.015625,
-    "dt": 0.001,
+    "dx": 0.15625,
+    "dt": 0.0005,
     "T": 10,
-    "sigma": 6.0,
+    "sigma": 15,
+    "sigma_mm": 2.34375,
     "c0_max": 0.8
   },
   "PARAM_SWEEP": [
     {
       "D_c": 0.001,
-      "rho": 0.015,
-      "alpha": 0.01,
+      "rho": 0.005,
+      "alpha": 0.03,
       "label": "LGG Low-D / Low-rho"
     },
     {
       "D_c": 0.005,
-      "rho": 0.03,
-      "alpha": 0.02,
+      "rho": 0.01,
+      "alpha": 0.04,
       "label": "LGG Med-D / Low-rho"
     },
     {
       "D_c": 0.01,
-      "rho": 0.036,
-      "alpha": 0.01,
+      "rho": 0.012,
+      "alpha": 0.03,
       "label": "LGG High-D / Low-rho"
     },
     {
       "D_c": 0.01,
-      "rho": 0.09,
-      "alpha": 0.02,
+      "rho": 0.03,
+      "alpha": 0.05,
       "label": "GBM Low-D / Med-rho"
     },
     {
       "D_c": 0.02,
-      "rho": 0.12,
-      "alpha": 0.02,
+      "rho": 0.04,
+      "alpha": 0.05,
       "label": "GBM Med-D / High-rho"
     },
     {
       "D_c": 0.034,
-      "rho": 0.15,
-      "alpha": 0.02,
+      "rho": 0.05,
+      "alpha": 0.05,
       "label": "GBM High-D / High-rho"
     },
     {
       "D_c": 0.003,
-      "rho": 0.045,
-      "alpha": 0.01,
+      "rho": 0.015,
+      "alpha": 0.03,
       "label": "Mid Low-D / Low-rho"
     },
     {
       "D_c": 0.008,
-      "rho": 0.06,
-      "alpha": 0.02,
+      "rho": 0.02,
+      "alpha": 0.04,
       "label": "Mid Med-D / Med-rho"
     },
     {
       "D_c": 0.015,
-      "rho": 0.075,
-      "alpha": 0.01,
+      "rho": 0.025,
+      "alpha": 0.05,
       "label": "Mid High-D / Med-rho"
     },
     {
       "D_c": 0.025,
-      "rho": 0.105,
-      "alpha": 0.02,
+      "rho": 0.035,
+      "alpha": 0.05,
       "label": "Mid High-D / High-rho"
     },
     {
       "D_c": 0.001,
-      "rho": 0.15,
-      "alpha": 0.02,
+      "rho": 0.05,
+      "alpha": 0.05,
       "label": "Low-D / High-rho"
     },
     {
       "D_c": 0.034,
-      "rho": 0.015,
-      "alpha": 0.01,
+      "rho": 0.005,
+      "alpha": 0.03,
       "label": "High-D / Low-rho"
     }
   ],
   "VALIDATION_PARAMS": [
     {
       "D_c": 0.004,
-      "rho": 0.025,
-      "alpha": 0.01,
+      "rho": 0.008,
+      "alpha": 0.035,
       "label": "Val-1 LGG (interpolated)"
     },
     {
       "D_c": 0.018,
-      "rho": 0.045,
-      "alpha": 0.02,
+      "rho": 0.035,
+      "alpha": 0.05,
       "label": "Val-2 GBM (interpolated)"
     },
     {
       "D_c": 0.012,
-      "rho": 0.05,
-      "alpha": 0.015,
-      "label": "Val-3 Mid (near boundary)"
+      "rho": 0.022,
+      "alpha": 0.04,
+      "label": "Val-3 Mid (interpolated)"
     }
   ]
 }

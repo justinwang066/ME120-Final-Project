@@ -24,38 +24,60 @@ OUT_DIR  = "./pinn_output/"
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(OUT_DIR,  exist_ok=True)
 
+# IMPORTANT: sigma is defined here as SIGMA_GRID_UNITS and must be passed
+# explicitly to make_initial_conditions(). Do NOT read sigma from anywhere else.
+#
+# Key fix: D_n raised to 0.10 so that alpha/D_n = 0.05/0.10 = 0.5  (was 5e-4 → ratio=200)
+# This keeps n > 0 at the tumor center: n ≈ 1 - (alpha/D_n)*c_peak = 1 - 0.5*0.8 = 0.60
+
+SIGMA_GRID_UNITS = 15           # ← LOCKED: initial tumor radius in grid units
+                                 #   sigma_mm = 15 * (10/64) = 2.344 mm
+
 FIXED_PARAMS = {
-    "K":      1.0,
-    "D_n":    0.01,
-    "alpha":  0.02,
-    "N":      64,
-    "dx":     1.0 / 64,
-    "dt":     0.001,
-    "T":      10,
-    "sigma":  6.0,
-    "c0_max": 0.8,
+    "K":              1.0,
+    "D_n":            0.10,      # nutrient diffusion [mm²/day]  ← FIXED (was 0.01)
+    "alpha":          0.05,      # nutrient consumption [1/day]  ← alpha/D_n=0.5
+    "N":              64,
+    "dx":             10.0/64,   # spatial step [mm/grid unit]
+    "dt":             0.0005,    # time step [days]  ← halved for CFL with new D_n
+    "T":              10,
+    "sigma":          SIGMA_GRID_UNITS,
+    "sigma_mm":       SIGMA_GRID_UNITS * (10.0/64),  # = 2.344 mm — for logging only
+    "c0_max":         0.8,
 }
 
+assert FIXED_PARAMS["sigma"] == 15, "sigma must be 15 grid units"
+assert abs(FIXED_PARAMS["sigma_mm"] - 2.344) < 0.001, "sigma_mm must be ~2.344 mm"
+
+ratio = FIXED_PARAMS["alpha"] / FIXED_PARAMS["D_n"]
+n_at_peak = max(0, 1.0 - ratio * FIXED_PARAMS["c0_max"])
+assert n_at_peak > 0, f"Nutrient starved at peak: n={n_at_peak}. Increase D_n or decrease alpha."
+
 PARAM_SWEEP = [
-    {"D_c": 1.0e-3, "rho": 0.015, "alpha": 0.01, "label": "LGG Low-D / Low-rho"},
-    {"D_c": 5.0e-3, "rho": 0.030, "alpha": 0.02, "label": "LGG Med-D / Low-rho"},
-    {"D_c": 1.0e-2, "rho": 0.036, "alpha": 0.01, "label": "LGG High-D / Low-rho"},
-    {"D_c": 1.0e-2, "rho": 0.090, "alpha": 0.02, "label": "GBM Low-D / Med-rho"},
-    {"D_c": 2.0e-2, "rho": 0.120, "alpha": 0.02, "label": "GBM Med-D / High-rho"},
-    {"D_c": 3.4e-2, "rho": 0.150, "alpha": 0.02, "label": "GBM High-D / High-rho"},
-    {"D_c": 3.0e-3, "rho": 0.045, "alpha": 0.01, "label": "Mid Low-D / Low-rho"},
-    {"D_c": 8.0e-3, "rho": 0.060, "alpha": 0.02, "label": "Mid Med-D / Med-rho"},
-    {"D_c": 1.5e-2, "rho": 0.075, "alpha": 0.01, "label": "Mid High-D / Med-rho"},
-    {"D_c": 2.5e-2, "rho": 0.105, "alpha": 0.02, "label": "Mid High-D / High-rho"},
-    {"D_c": 1.0e-3, "rho": 0.150, "alpha": 0.02, "label": "Low-D / High-rho"},
-    {"D_c": 3.4e-2, "rho": 0.015, "alpha": 0.01, "label": "High-D / Low-rho"},
+    {"D_c": 1.0e-3, "rho": 0.005, "alpha": 0.03, "label": "LGG Low-D / Low-rho"},
+    {"D_c": 5.0e-3, "rho": 0.010, "alpha": 0.04, "label": "LGG Med-D / Low-rho"},
+    {"D_c": 1.0e-2, "rho": 0.012, "alpha": 0.03, "label": "LGG High-D / Low-rho"},
+    {"D_c": 1.0e-2, "rho": 0.030, "alpha": 0.05, "label": "GBM Low-D / Med-rho"},
+    {"D_c": 2.0e-2, "rho": 0.040, "alpha": 0.05, "label": "GBM Med-D / High-rho"},
+    {"D_c": 3.4e-2, "rho": 0.050, "alpha": 0.05, "label": "GBM High-D / High-rho"},
+    {"D_c": 3.0e-3, "rho": 0.015, "alpha": 0.03, "label": "Mid Low-D / Low-rho"},
+    {"D_c": 8.0e-3, "rho": 0.020, "alpha": 0.04, "label": "Mid Med-D / Med-rho"},
+    {"D_c": 1.5e-2, "rho": 0.025, "alpha": 0.05, "label": "Mid High-D / Med-rho"},
+    {"D_c": 2.5e-2, "rho": 0.035, "alpha": 0.05, "label": "Mid High-D / High-rho"},
+    {"D_c": 1.0e-3, "rho": 0.050, "alpha": 0.05, "label": "Low-D / High-rho"},
+    {"D_c": 3.4e-2, "rho": 0.005, "alpha": 0.03, "label": "High-D / Low-rho"},
 ]
 
+assert max(p['rho'] for p in PARAM_SWEEP) <= 0.050, "rho must not exceed 0.050"
+
 VALIDATION_PARAMS = [
-    {"D_c": 4.0e-3, "rho": 0.025, "alpha": 0.010, "label": "Val-1 LGG (interpolated)"},
-    {"D_c": 1.8e-2, "rho": 0.045, "alpha": 0.020, "label": "Val-2 GBM (interpolated)"},
-    {"D_c": 1.2e-2, "rho": 0.050, "alpha": 0.015, "label": "Val-3 Mid (near boundary)"},
+    {"D_c": 4.0e-3, "rho": 0.008, "alpha": 0.035, "label": "Val-1 LGG (interpolated)"},
+    {"D_c": 1.8e-2, "rho": 0.035, "alpha": 0.050, "label": "Val-2 GBM (interpolated)"},
+    {"D_c": 1.2e-2, "rho": 0.022, "alpha": 0.040, "label": "Val-3 Mid (interpolated)"},
 ]
+
+for v in VALIDATION_PARAMS:
+    assert v['rho'] <= 0.045, f"Val rho={v['rho']} exceeds 0.045 interpolation bound"
 
 CFG = {
     "train_path": os.path.join(DATA_DIR, "dataset.npz"),
@@ -67,8 +89,8 @@ CFG = {
     "K":          FIXED_PARAMS["K"],
     "D_n":        FIXED_PARAMS["D_n"],
     "D_c_min":    1e-3,   "D_c_max":   3.4e-2,
-    "rho_min":    0.015,  "rho_max":   0.150,
-    "alpha_min":  0.01,   "alpha_max": 0.02,
+    "rho_min":    0.005,  "rho_max":   0.050,
+    "alpha_min":  0.03,   "alpha_max": 0.05,
     "enc_channels":      [1, 32, 64, 64, 128],
     "dec_channels":      [128, 64, 32, 16, 1],
     "film_hidden":       64,
@@ -108,15 +130,23 @@ print("=" * 62)
 print("  ME120 — Tumor Growth PINN")
 print("=" * 62)
 print(f"  Grid: {N}×{N}  |  dx={dx:.4f}  |  dt={dt}  |  T={T} days")
+print(f"  sigma = {SIGMA_GRID_UNITS} grid units = {FP['sigma_mm']:.3f} mm")
+print(f"  alpha/D_n = {ratio:.1f}  →  n at c_peak=0.8: {n_at_peak:.3f}")
 print(f"  Training sims: {len(PARAM_SWEEP)}  |  Val sims: {len(VALIDATION_PARAMS)}")
 print(f"  Device: {CFG['device']}")
 
 print("\n── CFL Stability Check ──────────────────────────────────────────")
+all_stable = True
 for p in PARAM_SWEEP:
     cfl_c = p["D_c"] * dt / dx**2
     cfl_n = D_n * dt / dx**2
-    status = "✓ STABLE" if max(cfl_c, cfl_n) < 0.25 else "✗ UNSTABLE"
+    cfl_max = max(cfl_c, cfl_n)
+    status = "✓ STABLE" if cfl_max < 0.25 else "✗ UNSTABLE"
+    if cfl_max >= 0.25:
+        all_stable = False
     print(f"  {p['label']:30s}  CFL_c={cfl_c:.5f}  CFL_n={cfl_n:.5f}  {status}")
+if not all_stable:
+    raise ValueError("CFL violation detected. Reduce FIXED_PARAMS['dt'].")
 
 
 # ── PDE Solver ────────────────────────────────────────────────────────────────
