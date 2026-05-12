@@ -1,8 +1,8 @@
-# ME120 Tumor Growth PINN
+# Physics Informed Neural Surrogates for Continuum Tumor Growth Forecasting
 
 ## Project Summary
 
-We model glioma growth using a physics-informed neural network (PINN). A finite-difference
+We model tumor growth using a physics-informed neural network (PINN). A finite-difference
 solver generates synthetic tumor concentration fields from a coupled reaction-diffusion PDE
 system spanning 12 parameter sets (LGG and GBM regimes). A U-Net with FiLM conditioning
 then learns to map an initial tumor field plus three PDE parameters (D_c, rho, alpha) to
